@@ -1,8 +1,8 @@
 # 股票选股监控系统
 
-基于通达信数据源的实时选股监控系统，支持自定义公式、EVE 评分算法、板块筛选。
-项目来源：https://mp.weixin.qq.com/s/fxR3G3sN4yDlHnCu7xX5hQ?scene=1
-通达信量化平台帮助文档: https://help.tdx.com.cn/quant/docs/markdown/ctx.stock.md/mindoc-1h10q7i3702rk.html 
+- 基于通达信数据源的实时选股监控系统，支持自定义公式、EVE 评分算法、板块筛选。
+- 项目来源：https://mp.weixin.qq.com/s/fxR3G3sN4yDlHnCu7xX5hQ?scene=1
+- 通达信量化平台帮助文档: https://help.tdx.com.cn/quant/docs/markdown/ctx.stock.md/mindoc-1h10q7i3702rk.html 
 
 ## 功能
 
