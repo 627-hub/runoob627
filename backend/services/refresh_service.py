@@ -111,30 +111,44 @@ async def refresh_stock_data():
     # 检查数据库是否已是最新交易日，避免重复刷新
     trade_date = get_today_str()
     try:
-        latest_db = session.query(StockMetrics.trade_date).order_by(StockMetrics.trade_date.desc()).first()
-        latest_db_date = latest_db[0] if latest_db else None
+        # 先查 StockMetrics 表
+        latest_metrics = session.query(StockMetrics.trade_date).order_by(StockMetrics.trade_date.desc()).first()
+        latest_db_date = latest_metrics[0] if latest_metrics else None
+        # 如果 StockMetrics 没有数据，再查 StockFormula 表（可能上次刷新中途失败）
+        if latest_db_date is None:
+            latest_formula = session.query(StockFormula.trade_date).order_by(StockFormula.trade_date.desc()).first()
+            formula_date = latest_formula[0] if latest_formula else None
+            if formula_date:
+                logger.warning(f"交易日检查：StockMetrics 无数据，但 StockFormula 最新日期={formula_date}（上次刷新可能中途失败）")
+        logger.info(f"交易日检查：DB 最新日期={latest_db_date}, 今日={trade_date}")
         if latest_db_date:
             sh_dates = TDXService.get_trading_dates(market="SH", count=1)
             sz_dates = TDXService.get_trading_dates(market="SZ", count=1)
+            logger.info(f"交易日检查：通达信 SH={sh_dates}, SZ={sz_dates}")
             all_latest = [d for d in (sh_dates or []) + (sz_dates or []) if d]
             if all_latest:
                 latest_tdx_date = max(all_latest)
+                logger.info(f"交易日检查：最新 TDX 交易日={latest_tdx_date}")
                 if latest_db_date >= latest_tdx_date:
                     logger.info(f"数据库交易日 {latest_db_date} >= 最新交易日 {latest_tdx_date}，跳过刷新")
                     last_refresh_status["last_status"] = "skipped"
                     last_refresh_status["last_run"] = datetime.now().isoformat()
                     last_refresh_status["running"] = False
                     return {"status": "skipped", "reason": f"数据已是最新交易日 {latest_db_date}"}
+            else:
+                logger.info("交易日检查：通达信未返回交易日数据，跳过检查继续刷新")
+        else:
+            logger.info("交易日检查：DB 无历史数据，跳过检查继续刷新")
     except Exception as e:
         logger.warning(f"交易日检查失败，继续刷新: {e}")
 
     # 2) 增量更新：只清除当天的指标数据和公式标注，保留历史
     try:
         # 只删除当天的公式标注和指标数据，实现增量更新
-        session.query(StockFormula).filter(StockFormula.trade_date == trade_date).delete(synchronize_session=False)
-        session.query(StockMetrics).filter(StockMetrics.trade_date == trade_date).delete(synchronize_session=False)
+        formula_deleted = session.query(StockFormula).filter(StockFormula.trade_date == trade_date).delete(synchronize_session=False)
+        metrics_deleted = session.query(StockMetrics).filter(StockMetrics.trade_date == trade_date).delete(synchronize_session=False)
         session.commit()
-        logger.info(f"已清除 {trade_date} 的旧数据，准备增量更新")
+        logger.info(f"已清除 {trade_date} 的旧数据（StockFormula={formula_deleted}行，StockMetrics={metrics_deleted}行），准备增量更新")
     except Exception as e:
         logger.warning(f"清除旧数据失败: {e}")
         session.rollback()
@@ -345,6 +359,27 @@ async def refresh_stock_data():
                 save_stock_formula(session, stock_code, formula_name, trade_date)
 
         session.commit()
+
+        # 6) 从 DB 查询历史评分，滚动计算 avg_score_8d
+        from sqlalchemy import func
+        avg_updated = 0
+        for stock_code in stocks_to_save:
+            past_scores = session.query(StockMetrics.score).filter(
+                StockMetrics.stock_code == stock_code,
+                StockMetrics.trade_date < trade_date,
+                StockMetrics.score.isnot(None),
+            ).order_by(StockMetrics.trade_date.desc()).limit(8).all()
+            valid = [s[0] for s in past_scores if s[0] is not None]
+            if valid:
+                avg = round(sum(valid) / len(valid), 2)
+                session.query(StockMetrics).filter(
+                    StockMetrics.stock_code == stock_code,
+                    StockMetrics.trade_date == trade_date,
+                ).update({"avg_score_8d": avg}, synchronize_session=False)
+                avg_updated += 1
+        if avg_updated:
+            session.commit()
+            logger.info(f"DB 历史评分滚动平均完成: {avg_updated} 只")
 
         log_obj = session.query(RefreshLog).filter(RefreshLog.id == log_id).first()
         if log_obj:

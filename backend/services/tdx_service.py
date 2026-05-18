@@ -65,13 +65,19 @@ class TDXService:
             return True
 
         try:
-            # 使用当前模块路径初始化
-            import inspect
-
-            current_file = inspect.getfile(cls)
-            tq.initialize(current_file)
+            # 初始化路径：优先从插件路径推导TDX根目录，失败则用当前模块路径
+            init_path = config.TDX_PLUGIN_PATH
+            if init_path:
+                # TDX_PLUGIN_PATH = C:/new_tdx64/PYPlugins/user
+                # TDX根目录 = C:/new_tdx64
+                tdx_root = os.path.dirname(os.path.dirname(init_path))
+                init_path = tdx_root
+            else:
+                import inspect
+                init_path = inspect.getfile(cls)
+            tq.initialize(init_path)
             cls._initialized = True
-            logger.info("通达信初始化成功")
+            logger.info(f"通达信初始化成功，路径: {init_path}")
             return True
         except Exception as e:
             logger.error(f"通达信初始化失败: {e}")
@@ -227,7 +233,7 @@ class TDXService:
             return []
 
         try:
-            dates = tq.get_trading_dates(market=market, count=count)
+            dates = tq.get_trading_dates(market=market, start_time='', end_time='', count=count)
             return dates or []
         except Exception as e:
             logger.debug(f"获取交易日失败: {e}")
