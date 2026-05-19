@@ -68,8 +68,8 @@ class TDXService:
             # 初始化路径：优先从插件路径推导TDX根目录，失败则用当前模块路径
             init_path = config.TDX_PLUGIN_PATH
             if init_path:
-                # TDX_PLUGIN_PATH = C:/new_tdx64/PYPlugins/user
-                # TDX根目录 = C:/new_tdx64
+                # TDX_PLUGIN_PATH = C:/new_tdx/PYPlugins/user
+                # TDX根目录 = C:/new_tdx
                 tdx_root = os.path.dirname(os.path.dirname(init_path))
                 init_path = tdx_root
             else:
@@ -198,115 +198,25 @@ class TDXService:
             return info.get("ZJBH", "")
         return None
 
-    _sector_cache = None  # {stock_code: [{BlockCode, BlockName, BlockType}, ...]}
-
-    @classmethod
-    def _build_sector_cache(cls):
-        """构建全量板块反向映射缓存：遍历所有板块，对每个板块获取成分股，生成 stock → sectors 映射"""
-        if cls._sector_cache is not None:
-            return
-        if not cls._initialized:
-            cls.initialize()
-        if not TDX_AVAILABLE:
-            cls._sector_cache = {}
-            return
-
-        logger.info("正在构建板块反向映射缓存...")
-        cache = {}
-        try:
-            sectors = tq.get_sector_list(list_type=1)  # [{Code, Name}, ...]
-            if not sectors:
-                logger.warning("获取板块列表为空")
-                cls._sector_cache = cache
-                return
-
-            total = len(sectors)
-            for idx, sec in enumerate(sectors):
-                code = sec.get("Code", "")
-                name = sec.get("Name", "")
-                if not code or not name:
-                    continue
-                # 判断板块类型：根据 code 范围
-                blk_type = "概念"
-                try:
-                    num = int(code.split('.')[0])
-                    if 880200 <= num < 880500:
-                        blk_type = "概念"
-                    elif 880500 <= num < 880800:
-                        blk_type = "风格"
-                    elif 880800 <= num:
-                        blk_type = "指数"
-                except (ValueError, IndexError):
-                    blk_type = "概念"
-
-                if (idx + 1) % 100 == 0:
-                    logger.info(f"  板块扫描进度: {idx+1}/{total}")
-
-                try:
-                    stocks = tq.get_stock_list_in_sector(code, block_type=0, list_type=1)
-                except Exception:
-                    continue
-                if not stocks:
-                    continue
-                for s in stocks:
-                    scode = s.get("Code", "") if isinstance(s, dict) else s
-                    if not scode:
-                        continue
-                    record = {
-                        "BlockCode": code,
-                        "BlockName": name,
-                        "BlockType": blk_type,
-                    }
-                    if scode not in cache:
-                        cache[scode] = []
-                    # 避免重复（同一板块出现在多个范围？不会，但同一 stock_code 可能重复出现）
-                    if not any(r["BlockCode"] == code for r in cache[scode]):
-                        cache[scode].append(record)
-
-            logger.info(f"板块反向映射缓存构建完成: {len(cache)} 只股票, {total} 个板块")
-        except Exception as e:
-            logger.warning(f"构建板块缓存失败: {e}")
-        cls._sector_cache = cache
-
     @classmethod
     def get_stock_sectors(cls, stock_code: str) -> List[Dict]:
         """获取股票所属所有板块信息
         
-        优先使用行业/地区 info（来自 get_stock_info），再合并概念/风格缓存。
-        
         Returns:
-            [{"BlockCode": "xxx", "BlockName": "xxx", "BlockType": "行业/概念/风格/指数"}, ...]
+            [{"BlockCode": "xxx", "BlockName": "xxx", "BlockType": "行业/概念/风格/指数", ...}, ...]
         """
         if not cls._initialized:
             cls.initialize()
+
         if not TDX_AVAILABLE:
             return []
 
-        result = []
-
-        # 1. 从 get_stock_info 获取行业和地区
         try:
-            info = tq.get_stock_info(stock_code)
-            if info:
-                hy_name = info.get("rs_hyname", "")
-                if hy_name:
-                    result.append({"BlockCode": "", "BlockName": hy_name, "BlockType": "行业"})
-                dy_name = info.get("tdx_dyname", "")
-                if dy_name:
-                    result.append({"BlockCode": "", "BlockName": dy_name, "BlockType": "地区"})
+            result = tq.get_relation(stock_code=stock_code)
+            return result if result else []
         except Exception as e:
-            logger.debug(f"获取股票基本信息板块失败 {stock_code}: {e}")
-
-        # 2. 从反向映射缓存获取概念/风格
-        cls._build_sector_cache()
-        cached = cls._sector_cache.get(stock_code, []) if cls._sector_cache else []
-        for c in cached:
-            # 跳过已在 info 中出现的行业/地区名称
-            if any(r["BlockName"] == c["BlockName"] for r in result):
-                continue
-            result.append(c)
-
-        return result
+            logger.debug(f"获取股票板块失败 {stock_code}: {e}")
+            return []
 
     @classmethod
     def get_trading_dates(cls, market: str = "SH", count: int = 10) -> List[str]:

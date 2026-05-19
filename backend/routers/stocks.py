@@ -146,14 +146,22 @@ async def get_stocks(
         )
         formula_list = [f[0] for f in formulas]
 
-        # 获取板块类型列表
-        sector_types = (
-            db.query(StockSector.block_type)
+        # 获取板块数据（按类型分组）
+        sector_rows = (
+            db.query(StockSector.block_name, StockSector.block_type)
             .filter(StockSector.stock_code == s.code)
-            .distinct()
             .all()
         )
-        block_types = [t[0] for t in sector_types if t[0]]
+        sectors_by_type = {}
+        block_types = []
+        for name, typ in sector_rows:
+            if typ:
+                if typ not in block_types:
+                    block_types.append(typ)
+                if typ not in sectors_by_type:
+                    sectors_by_type[typ] = []
+                if name not in sectors_by_type[typ]:
+                    sectors_by_type[typ].append(name)
 
         result.append(
             {
@@ -166,6 +174,7 @@ async def get_stocks(
                 "market_cap": getattr(s, 'market_cap', None),
                 "sectors": getattr(s, 'sectors', None),
                 "block_types": block_types,
+                "sectors_by_type": sectors_by_type,
                 "open": metrics.open if metrics else None,
                 "high": metrics.high if metrics else None,
                 "low": metrics.low if metrics else None,

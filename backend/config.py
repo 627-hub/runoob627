@@ -1,10 +1,16 @@
 import os
+from dotenv import load_dotenv
 
 # backend 目录：E:\py_work\tdxplugins\backend
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # 项目根目录（tdxplugins）：E:\py_work\tdxplugins
 PROJECT_ROOT = os.path.dirname(BASE_DIR)
+
+# 自动加载 .env 文件（项目根目录下）
+dotenv_path = os.path.join(PROJECT_ROOT, '.env')
+if os.path.exists(dotenv_path):
+    load_dotenv(dotenv_path)
 
 # 日志目录（项目根目录下的 logs 文件夹）
 LOGS_DIR = os.path.join(PROJECT_ROOT, "logs")
@@ -29,7 +35,7 @@ TDX_CONFIG = {
     "multi_board_sector": "880785.SH",
 }
 
-REFRESH_INTERVAL_MINUTES = 10
+REFRESH_INTERVAL_MINUTES = 120
 
 FILTER_DEFAULT = {
     "min_pct_change": None,
