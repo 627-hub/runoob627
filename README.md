@@ -47,7 +47,7 @@ tdxplugins/
 
 - Python 3.9+
 - Node.js 18+
-- 通达信软件（含 `tqcenter` 插件，路径如 `C:/new_tdx64/PYPlugins/user`）
+- 通达信软件（含 `tqcenter` 插件，路径如 `C:/new_tdx/PYPlugins/user`）
 
 ### 后端
 
@@ -61,7 +61,7 @@ start_backend.bat               # 或手动设置环境变量
 
 ```bash
 cd backend
-set TDX_PLUGIN_PATH=C:/new_tdx64/PYPlugins/user
+set TDX_PLUGIN_PATH=C:/new_tdx/PYPlugins/user
 python main.py
 ```
 

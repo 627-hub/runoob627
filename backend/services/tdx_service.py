@@ -68,8 +68,8 @@ class TDXService:
             # 初始化路径：优先从插件路径推导TDX根目录，失败则用当前模块路径
             init_path = config.TDX_PLUGIN_PATH
             if init_path:
-                # TDX_PLUGIN_PATH = C:/new_tdx64/PYPlugins/user
-                # TDX根目录 = C:/new_tdx64
+                # TDX_PLUGIN_PATH = C:/new_tdx/PYPlugins/user
+                # TDX根目录 = C:/new_tdx
                 tdx_root = os.path.dirname(os.path.dirname(init_path))
                 init_path = tdx_root
             else:

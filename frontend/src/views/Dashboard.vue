@@ -1,219 +1,98 @@
 <template>
   <div class="dashboard">
-    <el-row :gutter="20">
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-icon" style="background: #409eff">
-            <el-icon :size="30"><DataLine /></el-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ stats.total_stocks }}</div>
-            <div class="stat-label">股票总数</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-icon" style="background: #67c23a">
-            <el-icon :size="30"><TrendCharts /></el-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ stats.up_count }}</div>
-            <div class="stat-label">上涨股票</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-icon" style="background: #f56c6c">
-            <el-icon :size="30"><WarnTriangleFilled /></el-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ stats.limit_up_count }}</div>
-            <div class="stat-label">涨停股票</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-icon" style="background: #e6a23c">
-            <el-icon :size="30"><Calendar /></el-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ stats.latest_date || '-' }}</div>
-            <div class="stat-label">最新交易日</div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
+    <div class="stats-row">
+      <div class="stat-card" v-for="card in statCards" :key="card.label"
+        :style="{ '--card-color': card.color }">
+        <div class="stat-icon">
+          <el-icon :size="28"><component :is="card.icon" /></el-icon>
+        </div>
+        <div class="stat-body">
+          <div class="stat-value">{{ card.value }}</div>
+          <div class="stat-label">{{ card.label }}</div>
+        </div>
+      </div>
+    </div>
 
-
-    <el-row :gutter="20" style="margin-top: 20px">
-      <el-col :span="24">
-        <el-card>
-          <template #header>
-            <span>股票列表</span>
-          </template>
-          <StockList />
-        </el-card>
-      </el-col>
-    </el-row>
+    <el-card shadow="never" class="section-card">
+      <template #header>
+        <div class="section-header">
+          <span>快捷筛选</span>
+        </div>
+      </template>
+      <div class="quick-filters">
+        <el-button @click="goStocks({ sort_by: 'score', sort_order: 'desc' })" round>按评分排序</el-button>
+        <el-button type="danger" @click="goStocks({ min_pct_change: 9.9 })" round>涨停股票</el-button>
+        <el-button type="warning" @click="goStocks({ min_pct_change: 5 })" round>涨幅 ≥5%</el-button>
+        <el-button @click="goStocks({ min_pct_change: 0 })" round>上涨股票</el-button>
+        <el-button @click="goStocks({})" round>全部股票</el-button>
+      </div>
+    </el-card>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { stocksApi, systemApi, filtersApi } from '@/api'
-import StockList from './StockList.vue'
+import { DataLine, TrendCharts, WarnTriangleFilled, Calendar } from '@element-plus/icons-vue'
+import { stocksApi } from '@/api'
 
 const router = useRouter()
 const stats = ref({
-  total_stocks: 0,
-  stocks_with_metrics: 0,
-  latest_date: null,
-  up_count: 0,
-  limit_up_count: 0
-})
-const refreshStatus = ref({
-  running: false,
-  last_run: null,
-  last_status: null,
-  stock_count: 0
+  total_stocks: 0, up_count: 0, limit_up_count: 0, latest_date: null
 })
 
+const statCards = ref([
+  { icon: DataLine, label: '股票总数', value: '-', color: '#409eff' },
+  { icon: TrendCharts, label: '上涨股票', value: '-', color: '#67c23a' },
+  { icon: WarnTriangleFilled, label: '涨停股票', value: '-', color: '#f56c6c' },
+  { icon: Calendar, label: '最新交易日', value: '-', color: '#e6a23c' },
+])
 
-  // Active filter display
-const activeFilterSummary = ref('暂无激活筛选')
-// Keep track of active filter name for better UX
-const activeFilterName = ref(null)
-
-async function loadActiveFilter() {
-  try {
-    const res = await filtersApi.getActiveFilter()
-    const data = res?.data || {}
-    const cfg = data.config ?? data
-    const name = data.name ?? null
-    activeFilterName.value = name
-    if (!cfg || Object.keys(cfg).length === 0) {
-      activeFilterSummary.value = name
-        ? `激活筛选: ${name}`
-        : '默认筛选: 主板+排 ST+市值筛选'
-      return
-    }
-    // 简单摘要展示，仅展示关键项
-    const parts = []
-    if (cfg.is_mainboard_only) parts.push('仅主板')
-    if (cfg.exclude_st) parts.push('排除 ST')
-    if (cfg.min_market_cap != null) parts.push(`市值≥${(cfg.min_market_cap/1e8).toFixed(2)}亿`)
-    if (parts.length === 0) parts.push('自定义筛选')
-    if (name) parts.unshift(`筛选名: ${name}`)
-    activeFilterSummary.value = parts.join('，')
-  } catch (e) {
-    console.error('读取当前激活筛选失败', e)
-  }
-}
-
-async function loadStats() {
+onMounted(async () => {
   try {
     const res = await stocksApi.getStats()
     stats.value = res.data
-  } catch (e) {
-    console.error('获取统计失败:', e)
-  }
-}
-
-async function loadRefreshStatus() {
-  try {
-    const res = await systemApi.getRefreshStatus()
-    refreshStatus.value = res.data
-  } catch (e) {
-    console.error('获取刷新状态失败:', e)
-  }
-}
-
-function quickFilter(type) {
-  const query = {}
-  if (type === 'score') {
-    query.sort_by = 'score'
-    query.sort_order = 'desc'
-    query.page_size = 50
-  } else if (type === 'limit_up') {
-    query.min_pct_change = 9.9
-  } else if (type === 'up') {
-    query.min_pct_change = 0
-  }
-  router.push({ path: '/stocks', query })
-}
-
-onMounted(() => {
-  loadStats()
-  loadRefreshStatus()
-  loadActiveFilter()
-  // 读取定时器状态以初始化开关状态
-  loadSchedulerStatus()
+    statCards.value = [
+      { icon: DataLine, label: '股票总数', value: stats.value.total_stocks ?? '-', color: '#409eff' },
+      { icon: TrendCharts, label: '上涨股票', value: stats.value.up_count ?? '-', color: '#67c23a' },
+      { icon: WarnTriangleFilled, label: '涨停股票', value: stats.value.limit_up_count ?? '-', color: '#f56c6c' },
+      { icon: Calendar, label: '最新交易日', value: stats.value.latest_date || '-', color: '#e6a23c' },
+    ]
+  } catch (e) {}
 })
 
-async function loadSchedulerStatus() {
-  try {
-    const res = await systemApi.getRefreshStatus()
-    // 再次请求以确保状态，若接口返回 running，则以此更新 UI
-    // 这里简单保留现有刷新状态，将定时开关通过后端开关控制
-  } catch (e) {
-    console.error('读取调度状态失败:', e)
-  }
-}
-
-let autoRefreshEnabled = ref(false)
-async function toggleAutoRefresh(val) {
-  try {
-    if (val) {
-      await systemApi.startScheduler()
-    } else {
-      await systemApi.stopScheduler()
-    }
-  } catch (e) {
-    console.error('切换定时刷新失败', e)
-  }
+function goStocks(q) {
+  router.push({ path: '/stocks', query: q })
 }
 </script>
 
 <style scoped>
-.dashboard {
-  max-width: 1200px;
-  margin: 0 auto;
-}
+.dashboard { max-width: 1200px; margin: 0 auto; }
+
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 24px; }
 
 .stat-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  border-left: 4px solid var(--card-color);
 }
-
 .stat-icon {
-  width: 60px;
-  height: 60px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
+  width: 48px; height: 48px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--card-color);
+  background: color-mix(in srgb, var(--card-color) 10%, transparent);
 }
+.stat-value { font-size: 26px; font-weight: 700; color: #303133; line-height: 1.2; }
+.stat-label { font-size: 13px; color: #909399; margin-top: 4px; }
 
-.stat-value {
-  font-size: 28px;
-  font-weight: bold;
-  color: #303133;
-}
+.section-card { border-radius: 12px; }
+.section-card :deep(.el-card__header) { padding: 16px 20px; border-bottom: 1px solid #f0f2f5; }
+.section-header { font-size: 15px; font-weight: 600; color: #303133; }
 
-.stat-label {
-  font-size: 14px;
-  color: #909399;
-}
-
-.quick-filters {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
+.quick-filters { display: flex; gap: 10px; flex-wrap: wrap; padding: 4px 0; }
 </style>

@@ -309,7 +309,7 @@ refresh_logs (独立表)
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `TDX_PLUGIN_PATH` | `(空)` | 通达信插件路径（必填，如 `C:/new_tdx64/PYPlugins/user`） |
+| `TDX_PLUGIN_PATH` | `(空)` | 通达信插件路径（必填，如 `C:/new_tdx/PYPlugins/user`） |
 | `CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000` | CORS 允许源 |
 | `API_TOKEN` | `(空)` | API 认证 Token (为空时禁用认证) |
 
@@ -461,7 +461,7 @@ npm run build                     # 生产构建
 
 ### 11.4 关键外部依赖: 通达信插件
 
-- 路径: 由 `TDX_PLUGIN_PATH` 环境变量指定（如 `C:/new_tdx64/PYPlugins/user`）
+- 路径: 由 `TDX_PLUGIN_PATH` 环境变量指定（如 `C:/new_tdx/PYPlugins/user`）
 - 模块: `tqcenter.tq` — 通达信 Python 插件 SDK
 - 功能依赖: 获取股票列表、板块成分股、行情数据、运行选股公式、获取股票信息
 - 无此依赖时系统无法获取数据 (所有数据接口返回空结果)

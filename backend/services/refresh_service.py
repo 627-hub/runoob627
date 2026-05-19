@@ -36,23 +36,23 @@ REFRESH_JOB_ID = "data_refresh"
 
 
 def _save_sectors(session, stock_code, trade_date):
-    """保存板块数据到 stock_sectors 表（幂等，先删后插）"""
+    """保存板块数据到 stock_sectors 表（先查，查到再删旧插新，查不到保留原数据）"""
     try:
-        session.query(StockSector).filter(StockSector.stock_code == stock_code).delete()
         sectors_list = TDXService.get_stock_sectors(stock_code)
-        if sectors_list:
-            for s in sectors_list:
-                record = StockSector(
-                    stock_code=stock_code,
-                    block_code=s.get("BlockCode", ""),
-                    block_name=s.get("BlockName", ""),
-                    block_type=s.get("BlockType", ""),
-                    trade_date=trade_date,
-                )
-                session.add(record)
-            sectors_str = ",".join([s.get("BlockName", "") for s in sectors_list if s.get("BlockName")])
-        else:
-            sectors_str = ""
+        if not sectors_list:
+            return
+        # 查到有效数据后，再删旧插新
+        session.query(StockSector).filter(StockSector.stock_code == stock_code).delete()
+        for s in sectors_list:
+            record = StockSector(
+                stock_code=stock_code,
+                block_code=str(s.get("BlockCode", "")),
+                block_name=s.get("BlockName", ""),
+                block_type=s.get("BlockType", ""),
+                trade_date=trade_date,
+            )
+            session.add(record)
+        sectors_str = ",".join([s.get("BlockName", "") for s in sectors_list if s.get("BlockName")])
         stock_obj = session.query(Stock).filter(Stock.code == stock_code).first()
         if stock_obj:
             stock_obj.sectors = sectors_str

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import StockList from '../views/StockList.vue'
 import Dashboard from '../views/Dashboard.vue'
+import FilterConfig from '../views/FilterConfig.vue'
 
 const routes = [
   {
@@ -12,6 +13,11 @@ const routes = [
     path: '/stocks',
     name: 'StockList',
     component: StockList
+  },
+  {
+    path: '/filters',
+    name: 'FilterConfig',
+    component: FilterConfig
   }
 ]
 

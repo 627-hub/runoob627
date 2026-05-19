@@ -1,10 +1,16 @@
 import os
+from dotenv import load_dotenv
 
 # backend 目录：E:\py_work\tdxplugins\backend
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # 项目根目录（tdxplugins）：E:\py_work\tdxplugins
 PROJECT_ROOT = os.path.dirname(BASE_DIR)
+
+# 自动加载 .env 文件（项目根目录下）
+dotenv_path = os.path.join(PROJECT_ROOT, '.env')
+if os.path.exists(dotenv_path):
+    load_dotenv(dotenv_path)
 
 # 日志目录（项目根目录下的 logs 文件夹）
 LOGS_DIR = os.path.join(PROJECT_ROOT, "logs")
@@ -29,7 +35,7 @@ TDX_CONFIG = {
     "multi_board_sector": "880785.SH",
 }
 
-REFRESH_INTERVAL_MINUTES = 10
+REFRESH_INTERVAL_MINUTES = 120
 
 FILTER_DEFAULT = {
     "min_pct_change": None,
@@ -48,22 +54,16 @@ FILTER_DEFAULT = {
 
 FORMULA_CATEGORIES = {
     "涨停类": [
-        "低位启动",
-        "涨停试盘",
-        "曾涨停",
-        "20CM",
-        "1进2",
         "5板以上",
         "4进5",
         "3进4",
         "2进3",
-        "断板",
         "炸板反包",
     ],
     "跌停类": ["曾跌停", "跌停反转"],
-    "趋势类": ["权重趋势", "强趋势股", "回调", "趋势弱转强"],
-    "形态类": ["N型涨停双响炮", "九转低9选股", "短庄起爆牛", "神龙出海"],
-    "其他": ["龙头股炸板", "B011", "B012", "B013", "B20", "B21", "B22", "N047", "烂板股"],
+    "趋势类": ["权重趋势"],
+    "形态类": ["短庄起爆牛"],
+    "其他": ["龙头股炸板"],
 }
 
 DEFAULT_ACTIVE_FORMULAS = ["3进4", "2进3", "5板以上", "4进5"]
